@@ -1,7 +1,9 @@
 # School Management - Standalone Client Demo
 
-Independent copy of the Angular frontend for client presentations. The original
-frontend, API, SQL Server database, and backend solution are unchanged.
+Standalone Angular UI for client presentations. This public repository contains
+only the demo frontend, fictional sample data, documentation, and GitHub Pages
+deployment workflow. It does not contain the production API, database migrations,
+backend tests, or database credentials.
 
 ## Start the demo
 
@@ -10,7 +12,7 @@ Node.js 24) and npm. No .NET SDK, SQL Server, connection string, or API process 
 required.
 
 ```powershell
-Set-Location C:\Users\paulo\source\repos\SchoolManagement_Master\SchoolManagement.Demo\SchoolManagement.frontend
+Set-Location C:\Users\paulo\source\repos\SchoolManagement-Demo\SchoolManagement.frontend
 npm.cmd ci
 npm.cmd start
 ```
@@ -47,8 +49,8 @@ The demo includes an automatic deployment workflow for a separate
 `SchoolManagement-Demo` repository. See
 [GitHub Pages implementation and deployment instructions](docs/github-pages-deployment.md)
 for exporting only the demo, creating the repository, enabling Pages, and publishing.
-No API/database server is needed. Repository creation and the actual deployment
-must still be completed on GitHub.
+No API/database server is needed. The demo is hosted at
+[School Management Demo](https://paopitz.github.io/SchoolManagement-Demo/).
 
 ## Build and test
 
@@ -66,6 +68,8 @@ It is deliberately not added to the original backend solution.
 
 ## Safety and isolation
 
+- Keep this repository demo-only. Never push the full-source project's branches
+  or history here, even under a separate branch name.
 - All records and passwords are fictional samples, not copied database data.
 - `DemoData` owns typed sample arrays in browser memory.
 - `DemoBackend` replaces Angular's terminal `HttpBackend`. Service calls keep their
