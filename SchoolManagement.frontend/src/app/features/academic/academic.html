@@ -1,0 +1,109 @@
+<section class="page-heading">
+  <div><p class="eyebrow">CONFIGURATION</p><h1>Academic structure</h1><p>Maintain the catalogs used by enrollment and scheduling.</p></div>
+  <button class="secondary" type="button" (click)="loadAll()">Refresh</button>
+</section>
+@if (error()) { <div class="alert error" role="alert">{{ error() }}</div> }
+@if (notice()) { <div class="alert success" role="status">{{ notice() }}</div> }
+<nav class="tabs" aria-label="Academic configuration">
+  @for (tab of [{id:'school-years',label:'School years'},{id:'departments',label:'Departments & grades'},{id:'tracks',label:'Tracks & strands'},{id:'subjects',label:'Subjects'},{id:'rooms',label:'Rooms'},{id:'sections',label:'Sections & offerings'}]; track tab.id) {
+    <button type="button" [class.active]="activeTab === tab.id" (click)="activeTab = tab.id">{{ tab.label }}</button>
+  }
+  @if (editingKind && canWrite()) { <button type="button" class="cancel-edit" (click)="cancelEdit()">Cancel edit</button> }
+</nav>
+<section class="panel">
+  @if (activeTab === 'school-years') {
+    <div class="split">
+      <form class="form-block" [hidden]="!canWrite()" (ngSubmit)="addYear()"><h2>{{ editingKind === 'school-year' ? 'Edit school year' : 'Add school year' }}</h2>
+        <label>Code<input name="yearCode" [(ngModel)]="yearCode" required maxlength="20" placeholder="2026-2027"></label>
+        <div class="two-fields"><label>Starts<input name="startsOn" type="date" [(ngModel)]="startsOn" required></label><label>Ends<input name="endsOn" type="date" [(ngModel)]="endsOn" required></label></div>
+        <button class="primary" [disabled]="saving()">{{ editingKind === 'school-year' ? 'Save school year' : 'Create school year' }}</button>
+      </form>
+      <div><h2>School years</h2><div class="record-list">@for (year of years(); track year.schoolYearId) {
+        <article><div><strong>{{ year.code }}</strong><small>{{ year.startsOn }} — {{ year.endsOn }}</small></div><button class="text-button" [hidden]="!canWrite()" type="button" (click)="edit('school-year', year)">Edit</button>
+          @if (year.isActive) { <span class="active-tag">Active</span> } @else { <button class="text-button" [hidden]="!canWrite()" type="button" (click)="activateYear(year.schoolYearId)">Activate</button> }
+        </article>
+      }</div></div>
+    </div>
+  }
+
+  @if (activeTab === 'departments') {
+    <div class="split">
+      <div class="form-block" [hidden]="!canWrite()">
+        <form (ngSubmit)="addDepartment()"><h2>{{ editingKind === 'department' ? 'Edit department' : 'Add department' }}</h2><label>Name<input name="departmentName" [(ngModel)]="departmentName" required maxlength="100"></label>
+          @if (editingKind === 'department') { <label class="toggle"><input name="departmentActive" type="checkbox" [(ngModel)]="editingDepartmentIsActive"> Active</label> }
+          <button class="primary" [disabled]="saving()">{{ editingKind === 'department' ? 'Save department' : 'Create department' }}</button>
+        </form>
+        <hr>
+        <form (ngSubmit)="addGrade()"><h2>{{ editingKind === 'grade' ? 'Edit grade level' : 'Add grade level' }}</h2><label>Department<select name="gradeDepartment" [(ngModel)]="gradeDepartmentId" required>@for (row of departments(); track row.departmentId) { <option [ngValue]="row.departmentId">{{ row.name }}</option> }</select></label>
+          <div class="two-fields"><label>Code<input name="gradeCode" [(ngModel)]="gradeCode" required maxlength="20"></label><label>Display name<input name="gradeName" [(ngModel)]="gradeName" required maxlength="100"></label></div>
+          <label>Sort order<input name="gradeSort" type="number" [(ngModel)]="gradeSortOrder"></label><button class="primary" [disabled]="saving()">{{ editingKind === 'grade' ? 'Save grade level' : 'Create grade level' }}</button>
+        </form>
+      </div>
+      <div><h2>Departments and grade levels</h2><div class="record-list">@for (row of departments(); track row.departmentId) {
+        <article><div><strong>{{ row.name }}</strong><small>{{ gradesForDepartment(row.departmentId) }} grade levels</small></div><button class="text-button" [hidden]="!canWrite()" type="button" (click)="edit('department', row)">Edit</button><span [class.active-tag]="row.isActive" [class.inactive-tag]="!row.isActive">{{ row.isActive ? 'Active' : 'Inactive' }}</span></article>
+      }</div><div class="record-list compact">@for (row of grades(); track row.gradeLevelId) {
+        <article><div><strong>{{ row.code }} · {{ row.name }}</strong><small>{{ row.departmentName }} · Order {{ row.sortOrder }}</small></div><button class="text-button" [hidden]="!canWrite()" type="button" (click)="edit('grade', row)">Edit</button></article>
+      }</div></div>
+    </div>
+  }
+
+  @if (activeTab === 'tracks') {
+    <div class="split">
+      <div class="form-block" [hidden]="!canWrite()">
+        <form (ngSubmit)="addTrack()"><h2>{{ editingKind === 'track' ? 'Edit track' : 'Add track' }}</h2><label>Name<input name="trackName" [(ngModel)]="trackName" required maxlength="100"></label>
+          @if (editingKind === 'track') { <label class="toggle"><input name="trackActive" type="checkbox" [(ngModel)]="editingTrackIsActive"> Active</label> }
+          <button class="primary" [disabled]="saving()">{{ editingKind === 'track' ? 'Save track' : 'Create track' }}</button>
+        </form><hr>
+        <form (ngSubmit)="addStrand()"><h2>{{ editingKind === 'strand' ? 'Edit strand' : 'Add strand' }}</h2><label>Track<select name="strandTrack" [(ngModel)]="strandTrackId" required>@for (row of tracks(); track row.trackId) { <option [ngValue]="row.trackId">{{ row.name }}</option> }</select></label>
+          <div class="two-fields"><label>Code<input name="strandCode" [(ngModel)]="strandCode" required maxlength="20"></label><label>Name<input name="strandName" [(ngModel)]="strandName" required maxlength="100"></label></div><button class="primary" [disabled]="saving()">{{ editingKind === 'strand' ? 'Save strand' : 'Create strand' }}</button>
+        </form>
+      </div>
+      <div><h2>Tracks and strands</h2><div class="record-list">@for (row of tracks(); track row.trackId) {
+        <article><div><strong>{{ row.name }}</strong><small>{{ strandsForTrack(row.trackId) }} strands</small></div><button class="text-button" [hidden]="!canWrite()" type="button" (click)="edit('track', row)">Edit</button><span [class.active-tag]="row.isActive" [class.inactive-tag]="!row.isActive">{{ row.isActive ? 'Active' : 'Inactive' }}</span></article>
+      } @for (row of strands(); track row.strandId) {
+        <article><div><strong>{{ row.code }} · {{ row.name }}</strong><small>{{ row.trackName }}</small></div><button class="text-button" [hidden]="!canWrite()" type="button" (click)="edit('strand', row)">Edit</button></article>
+      }</div></div>
+    </div>
+  }
+
+  @if (activeTab === 'subjects') {
+    <div class="split"><form class="form-block" [hidden]="!canWrite()" (ngSubmit)="addSubject()"><h2>{{ editingKind === 'subject' ? 'Edit subject' : 'Add subject' }}</h2>
+      <label>Code<input name="subjectCode" [(ngModel)]="subjectCode" required maxlength="30"></label><label>Name<input name="subjectName" [(ngModel)]="subjectName" required maxlength="150"></label>
+      @if (editingKind === 'subject') { <label class="toggle"><input name="subjectActive" type="checkbox" [(ngModel)]="editingSubjectIsActive"> Active</label> }
+      <button class="primary" [disabled]="saving()">{{ editingKind === 'subject' ? 'Save subject' : 'Create subject' }}</button>
+    </form><div><h2>Subject catalog</h2><div class="record-list">@for (row of subjects(); track row.subjectId) {
+      <article><div><strong>{{ row.code }} · {{ row.name }}</strong></div><button class="text-button" [hidden]="!canWrite()" type="button" (click)="edit('subject', row)">Edit</button><span [class.active-tag]="row.isActive" [class.inactive-tag]="!row.isActive">{{ row.isActive ? 'Active' : 'Inactive' }}</span></article>
+    }</div></div></div>
+  }
+
+  @if (activeTab === 'rooms') {
+    <div class="split"><form class="form-block" [hidden]="!canWrite()" (ngSubmit)="addRoom()"><h2>{{ editingKind === 'room' ? 'Edit room' : 'Add room' }}</h2>
+      <label>Code<input name="roomCode" [(ngModel)]="roomCode" required maxlength="20"></label><label>Name<input name="roomName" [(ngModel)]="roomName" required maxlength="100"></label><label>Capacity<input name="roomCapacity" type="number" min="1" [(ngModel)]="roomCapacity"></label>
+      @if (editingKind === 'room') { <label class="toggle"><input name="roomActive" type="checkbox" [(ngModel)]="editingRoomIsActive"> Active</label> }
+      <button class="primary" [disabled]="saving()">{{ editingKind === 'room' ? 'Save room' : 'Create room' }}</button>
+    </form><div><h2>Room catalog</h2><div class="record-list">@for (row of rooms(); track row.roomId) {
+      <article><div><strong>{{ row.code }} · {{ row.name }}</strong><small>{{ row.capacity ?? 'No capacity set' }}</small></div><button class="text-button" [hidden]="!canWrite()" type="button" (click)="edit('room', row)">Edit</button><span [class.active-tag]="row.isActive" [class.inactive-tag]="!row.isActive">{{ row.isActive ? 'Active' : 'Inactive' }}</span></article>
+    }</div></div></div>
+  }
+
+  @if (activeTab === 'sections') {
+    <div class="split"><div class="form-block" [hidden]="!canWrite()">
+      <form (ngSubmit)="addSection()"><h2>{{ editingKind === 'section' ? 'Edit section' : 'Create section' }}</h2>
+        @if (!editingKind) { <label>School year<select name="sectionYear" [(ngModel)]="sectionYearId" required>@for (row of years(); track row.schoolYearId) { <option [ngValue]="row.schoolYearId">{{ row.code }}</option> }</select></label><label>Grade level<select name="sectionGrade" [(ngModel)]="sectionGradeId" required>@for (row of grades(); track row.gradeLevelId) { <option [ngValue]="row.gradeLevelId">{{ row.name }} · {{ row.departmentName }}</option> }</select></label> }
+        <label>Section name<input name="sectionName" [(ngModel)]="sectionName" required maxlength="100"></label><label>Strand<select name="sectionStrand" [(ngModel)]="sectionStrandId"><option [ngValue]="null">No strand</option>@for (row of strands(); track row.strandId) { <option [ngValue]="row.strandId">{{ row.trackName }} · {{ row.name }}</option> }</select></label><label>Adviser<select name="adviserId" [(ngModel)]="adviserTeacherId"><option [ngValue]="null">No adviser assigned</option>@for (teacher of teacherChoices(adviserTeacherId); track teacher.teacherId) { <option [ngValue]="teacher.teacherId">{{ teacher.firstName }} {{ teacher.lastName }} · {{ teacher.employeeNumber }}{{ teacher.isActive ? '' : ' (Inactive)' }}</option> }</select></label>
+        <button class="primary" [disabled]="saving()">{{ editingKind === 'section' ? 'Save section' : 'Create section' }}</button>
+      </form><hr>
+      <form (ngSubmit)="editingKind === 'offering' ? saveOffering() : addOffering()"><h2>{{ editingKind === 'offering' ? 'Edit subject offering' : 'Assign subject and teacher' }}</h2>
+        <label>Section<select name="selectedSection" [(ngModel)]="selectedSectionId" (ngModelChange)="loadOfferings()" [disabled]="editingKind === 'offering'" required><option [ngValue]="0">Choose section</option>@for (row of sections(); track row.sectionId) { <option [ngValue]="row.sectionId">{{ row.schoolYearCode }} · {{ row.gradeLevelName }} · {{ row.name }}</option> }</select></label>
+        @if (editingKind !== 'offering') { <label>Subject<select name="offeringSubject" [(ngModel)]="offeringSubjectId" required>@for (row of subjects(); track row.subjectId) { <option [ngValue]="row.subjectId">{{ row.code }} · {{ row.name }}</option> }</select></label> }
+        <label>Teacher<select name="offeringTeacher" [(ngModel)]="offeringTeacherId"><option [ngValue]="null">Teacher unassigned</option>@for (teacher of teacherChoices(offeringTeacherId); track teacher.teacherId) { <option [ngValue]="teacher.teacherId">{{ teacher.firstName }} {{ teacher.lastName }} · {{ teacher.employeeNumber }}{{ teacher.isActive ? '' : ' (Inactive)' }}</option> }</select></label>
+        @if (editingKind === 'offering') { <label class="toggle"><input name="offeringActive" type="checkbox" [(ngModel)]="editingOfferingIsActive"> Active</label> }
+        <button class="primary" [disabled]="saving() || !selectedSectionId">{{ editingKind === 'offering' ? 'Save offering' : 'Assign subject' }}</button>
+      </form>
+    </div><div><h2>Sections</h2><div class="record-list">@for (row of sections(); track row.sectionId) {
+      <article><div><strong>{{ row.gradeLevelName }} · {{ row.name }}</strong><small>{{ row.schoolYearCode }} · {{ row.adviserName || 'No adviser assigned' }}</small></div><button class="text-button" [hidden]="!canWrite()" type="button" (click)="edit('section', row)">Edit</button></article>
+    }</div>@if (selectedSectionId) { <h2>Subject offerings</h2><div class="record-list compact">@for (row of offerings(); track row.sectionSubjectId) {
+      <article><div><strong>{{ row.subjectCode }} · {{ row.subjectName }}</strong><small>{{ row.teacherName || 'Teacher unassigned' }}</small></div><button class="text-button" [hidden]="!canWrite()" type="button" (click)="editOffering(row)">Edit</button><span [class.active-tag]="row.isActive" [class.inactive-tag]="!row.isActive">{{ row.isActive ? 'Active' : 'Inactive' }}</span></article>
+    }</div> }</div></div>
+  }
+</section>

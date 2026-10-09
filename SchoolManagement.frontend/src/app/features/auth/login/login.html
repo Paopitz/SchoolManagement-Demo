@@ -1,0 +1,44 @@
+<div class="login-page">
+  <form class="login-card" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <h1>School Management System</h1>
+    <p class="subtitle">Client demo only - fictional data, no API or database.</p>
+    <p>Sample login: <strong>demo.admin</strong> / <strong>Demo123!</strong></p>
+    <p>Other usernames: demo.superadmin, demo.registrar, demo.teacher, demo.adviser, demo.principal, demo.staff. All use Demo123!</p>
+
+    @if (errorMessage()) {
+      <div class="alert" role="alert">{{ errorMessage() }}</div>
+    }
+
+    <div class="field">
+      <label for="username">Username</label>
+      <input
+        id="username"
+        type="text"
+        formControlName="username"
+        autocomplete="username"
+        [attr.aria-invalid]="form.controls.username.invalid && form.controls.username.touched"
+      />
+      @if (form.controls.username.invalid && form.controls.username.touched) {
+        <span class="field-error">Username is required.</span>
+      }
+    </div>
+
+    <div class="field">
+      <label for="password">Password</label>
+      <input
+        id="password"
+        type="password"
+        formControlName="password"
+        autocomplete="current-password"
+        [attr.aria-invalid]="form.controls.password.invalid && form.controls.password.touched"
+      />
+      @if (form.controls.password.invalid && form.controls.password.touched) {
+        <span class="field-error">Password is required.</span>
+      }
+    </div>
+
+    <button type="submit" [disabled]="isSubmitting()">
+      {{ isSubmitting() ? 'Signing in…' : 'Sign in' }}
+    </button>
+  </form>
+</div>

@@ -1,0 +1,53 @@
+<section class="page-heading">
+  <div><p class="eyebrow">REGISTRAR WORKSPACE</p><h1>Enrollment</h1><p>Review pending requests, enroll students, and inspect year-by-year history.</p></div>
+  <button class="secondary" type="button" (click)="loadEnrollments()" [disabled]="loading()">Refresh</button>
+</section>
+
+@if (error()) { <div class="alert error" role="alert">{{ error() }}</div> }
+@if (notice()) { <div class="alert success" role="status">{{ notice() }}</div> }
+
+<section class="workspace-grid">
+  @if (canWrite()) {
+  <section class="panel enrollment-form">
+    <div class="panel-title"><div><p class="eyebrow">{{ editingEnrollmentId ? 'EDIT PENDING RECORD' : 'NEW RECORD' }}</p><h2>{{ editingEnrollmentId ? 'Update enrollment' : 'Create enrollment' }}</h2></div><span class="step">01 / 03</span></div>
+    <div class="field student-picker">
+      <label for="studentSearch">Find student</label>
+      <div class="inline-control"><input id="studentSearch" [(ngModel)]="studentSearch" (keyup.enter)="loadStudents()" placeholder="Name or student number"><button class="secondary" type="button" (click)="loadStudents()">Search</button></div>
+      @if (students().length && !editingEnrollmentId) {
+        <select aria-label="Select student" [(ngModel)]="selectedStudentId"><option [ngValue]="0">Choose a student</option>@for (student of students(); track student.studentId) { <option [ngValue]="student.studentId">{{ student.studentNumber }} · {{ studentName(student) }}</option> }</select>
+        <div class="pager"><span>{{ studentTotal() }} matches</span><button type="button" class="text-button" (click)="loadStudents(studentPage() - 1)" [disabled]="studentPage() <= 1">Previous</button><span>Page {{ studentPage() }}</span><button type="button" class="text-button" (click)="loadStudents(studentPage() + 1)" [disabled]="studentPage() * 20 >= studentTotal()">Next</button></div>
+      }
+    </div>
+    <div class="field"><label for="schoolYear">School year</label><select id="schoolYear" [(ngModel)]="schoolYearId" (ngModelChange)="loadSections()"><option [ngValue]="0">Choose school year</option>@for (year of schoolYears(); track year.schoolYearId) { <option [ngValue]="year.schoolYearId">{{ year.code }}{{ year.isActive ? ' · Active' : '' }}</option> }</select></div>
+    <div class="field"><label for="section">Section</label><select id="section" [(ngModel)]="sectionId" (ngModelChange)="loadOfferings()"><option [ngValue]="0">Choose section</option>@for (section of sections(); track section.sectionId) { <option [ngValue]="section.sectionId">{{ section.gradeLevelName }} · {{ section.name }}</option> }</select></div>
+    <div class="field"><label for="type">Enrollment type</label><select id="type" [(ngModel)]="enrollmentType"><option>New</option><option>Returning</option><option>Transferee</option></select></div>
+    @if (offerings().length) {
+      <fieldset class="subjects"><legend>Subjects · {{ selectedSubjectIds.length }} selected</legend>@for (subject of offerings(); track subject.sectionSubjectId) { <label class="check-row"><input type="checkbox" [checked]="selectedSubjectIds.includes(subject.sectionSubjectId)" (change)="toggleSubject(subject.sectionSubjectId, $any($event.target).checked)"><span>{{ subject.subjectCode }} · {{ subject.subjectName }}</span><small>{{ subject.teacherName || 'Teacher unassigned' }}</small></label> }</fieldset>
+    } @else if (sectionId) { <p class="muted">No active subject offerings are assigned to this section. Add offerings in Academic setup before creating a demo enrollment.</p> }
+    <div class="form-actions"><button class="primary" type="button" (click)="createEnrollment()" [disabled]="saving()">{{ saving() ? 'Saving…' : editingEnrollmentId ? 'Save pending changes' : 'Create pending enrollment' }}</button>@if (editingEnrollmentId) { <button class="secondary" type="button" (click)="cancelEdit()">Stop editing</button> }</div>
+  </section>
+  }
+
+  <section class="panel list-panel">
+    <div class="panel-title"><div><p class="eyebrow">RECORDS</p><h2>Enrollment register</h2></div><div class="filters"><label class="filter-label">School year<select [(ngModel)]="yearFilter" (ngModelChange)="filterChanged()"><option [ngValue]="0">All years</option>@for (year of schoolYears(); track year.schoolYearId) { <option [ngValue]="year.schoolYearId">{{ year.code }}</option> }</select></label><label class="filter-label">Section<select [(ngModel)]="sectionFilter" (ngModelChange)="filterChanged()"><option [ngValue]="0">All sections</option>@for (section of sections(); track section.sectionId) { <option [ngValue]="section.sectionId">{{ section.gradeLevelName }} · {{ section.name }}</option> }</select></label><label class="filter-label">Status<select [(ngModel)]="statusFilter" (ngModelChange)="filterChanged()"><option value="">All statuses</option><option>Pending</option><option>Enrolled</option><option>Cancelled</option><option>Transferred</option><option>Dropped</option></select></label></div></div>
+    @if (loading()) { <p class="muted">Loading enrollments…</p> }
+    @else if (enrollments().length === 0) { <div class="empty"><strong>No enrollment records</strong><span>Try another status filter or create a new enrollment.</span></div> }
+    @else {
+      <div class="table-wrap"><table><thead><tr><th>Student</th><th>School year / section</th><th>Type</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+        @for (item of enrollments(); track item.enrollmentId) {
+          <tr><td><strong>{{ item.studentName }}</strong><small>{{ item.studentNumber }}</small><button class="text-button" type="button" (click)="openHistory(item.studentId)">View history</button></td><td>{{ item.schoolYearCode }}<small>{{ item.gradeLevelName }} · {{ item.sectionName }}</small></td><td>{{ item.enrollmentType }}</td><td><span class="status" [class.pending]="item.status === 'Pending'">{{ item.status }}</span></td><td class="actions">
+            @if (canWrite() && item.status === 'Pending') { <button class="text-button" type="button" (click)="editEnrollment(item)">Edit</button><button class="text-button" type="button" (click)="act(item, 'confirm')" [disabled]="saving()">Confirm</button><button class="text-button danger-text" type="button" (click)="activeActionId = item.enrollmentId">Cancel</button> }
+            @if (canWrite() && item.status === 'Enrolled') { <button class="text-button" type="button" (click)="activeActionId = item.enrollmentId">Transfer / drop</button> }
+            @if (canWrite() && activeActionId === item.enrollmentId) { <div class="action-reason"><input [attr.aria-label]="'Reason for ' + item.studentName" [(ngModel)]="actionReason" placeholder="Reason required"><button class="text-button" type="button" (click)="act(item, item.status === 'Pending' ? 'cancel' : 'transfer')">{{ item.status === 'Pending' ? 'Apply cancel' : 'Transfer' }}</button>@if (item.status === 'Enrolled') { <button class="text-button danger-text" type="button" (click)="act(item, 'drop')">Drop</button> }</div> }
+          </td></tr>
+        }
+      </tbody></table></div><div class="pager"><span>{{ enrollmentTotal() }} records</span><button class="secondary" type="button" (click)="changeEnrollmentPage(-1)" [disabled]="enrollmentPage() <= 1">Previous</button><span>Page {{ enrollmentPage() }} of {{ maxEnrollmentPage() }}</span><button class="secondary" type="button" (click)="changeEnrollmentPage(1)" [disabled]="enrollmentPage() >= maxEnrollmentPage()">Next</button></div>
+    }
+  </section>
+</section>
+
+@if (history(); as records) {
+  <section class="panel history-panel"><div class="panel-title"><div><p class="eyebrow">STUDENT RECORD</p><h2>Enrollment history</h2></div><button class="secondary" type="button" (click)="history.set(null)">Close</button></div>
+    @if (records.length) { <div class="history-list">@for (record of records; track record.enrollmentId) { <article><strong>{{ record.schoolYearCode }}</strong><span>{{ record.gradeLevelName }} · {{ record.sectionName }}</span><span class="status">{{ record.status }}</span><small>{{ record.subjects.length }} subjects</small></article> }</div> } @else { <p class="muted">No enrollment history is recorded for this student.</p> }
+  </section>
+}

@@ -1,0 +1,26 @@
+:host { display:block; color:#253438; }
+.heading,.directory-head { display:flex; align-items:center; justify-content:space-between; gap:1rem; }
+.heading { margin-bottom:1rem; h1 { margin:0; font-size:1.8rem; } p:not(.eyebrow) { color:#68777b; margin:.35rem 0 0; } }
+.eyebrow { color:#147d72; font-size:.7rem; font-weight:800; letter-spacing:.08em; margin:0 0 .3rem; }
+.teachers-layout { display:grid; grid-template-columns:minmax(270px,340px) minmax(0,1fr); gap:1rem; align-items:start; }
+.panel { min-width:0; padding:1rem; background:#fff; border:1px solid #dce3e3; border-radius:6px; }
+.editor { display:grid; gap:.6rem; h2 { margin:0; font-size:1.05rem; } label:not(.check) { display:grid; gap:.3rem; color:#48595d; font-size:.8rem; font-weight:650; } input:not([type=checkbox]) { min-height:2.3rem; border:1px solid #cbd5d6; border-radius:4px; padding:.45rem .55rem; font:inherit; } input:focus { outline:2px solid #147d72; outline-offset:1px; } }
+.hint,.muted { color:#68777b; font-size:.76rem; margin:0; }
+.check { display:flex; align-items:center; gap:.5rem; font-size:.82rem; input { accent-color:#147d72; } }
+.actions { display:flex; align-items:center; flex-wrap:wrap; gap:.45rem; }
+.primary,.quiet { border-radius:4px; padding:.55rem .7rem; cursor:pointer; font:inherit; font-size:.81rem; }
+.primary { border:1px solid #147d72; background:#147d72; color:#fff; font-weight:700; }
+.quiet { border:1px solid #cbd5d6; background:#fff; color:#34494b; }
+.primary:disabled,.quiet:disabled { opacity:.5; cursor:default; }
+.directory-head { margin-bottom:.8rem; h2 { margin:0; font-size:1.05rem; } }
+.table-wrap { overflow:auto; }
+table { width:100%; border-collapse:collapse; text-align:left; font-size:.8rem; th { color:#68777b; font-size:.68rem; text-transform:uppercase; white-space:nowrap; } th,td { padding:.65rem .48rem; border-top:1px solid #e7eceb; vertical-align:middle; } }
+.state { color:#276446; font-size:.75rem; font-weight:750; }
+.state.off { color:#8a5550; }
+.text-link { border:0; background:transparent; color:#147d72; font-weight:700; cursor:pointer; }
+.empty { display:grid; gap:.35rem; padding:2rem; text-align:center; color:#68777b; font-size:.83rem; }
+.alert { padding:.7rem; margin-bottom:.75rem; border-radius:4px; font-size:.85rem; }
+.error { background:#fff0ed; color:#8d3027; }
+.success { background:#eaf6ef; color:#286243; }
+@media(max-width:900px) { .teachers-layout { grid-template-columns:1fr; } }
+@media(max-width:600px) { .heading,.directory-head { align-items:flex-start; flex-direction:column; } .panel { padding:.75rem; } }

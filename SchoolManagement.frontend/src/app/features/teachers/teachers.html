@@ -1,0 +1,41 @@
+<section class="heading">
+  <div><p class="eyebrow">STAFF DIRECTORY</p><h1>Teachers</h1><p>Create teacher profiles before linking them to sign-in accounts.</p></div>
+  <button class="quiet" type="button" (click)="load()" [disabled]="loading()">Refresh</button>
+</section>
+@if (error()) { <div class="alert error" role="alert">{{ error() }}</div> }
+@if (notice()) { <div class="alert success" role="status">{{ notice() }}</div> }
+<div class="teachers-layout">
+  @if (canWrite()) {
+    <form class="panel editor" (ngSubmit)="save()">
+      <p class="eyebrow">{{ editingId ? 'PROFILE DETAILS' : 'NEW PROFILE' }}</p>
+      <h2>{{ editingId ? 'Edit teacher' : 'Register teacher' }}</h2>
+      <label>Employee number<input name="employeeNumber" [(ngModel)]="employeeNumber" required maxlength="50" autocomplete="off"></label>
+      <label>First name<input name="firstName" [(ngModel)]="firstName" required maxlength="100" autocomplete="given-name"></label>
+      <label>Last name<input name="lastName" [(ngModel)]="lastName" required maxlength="100" autocomplete="family-name"></label>
+      <label class="check"><input name="active" type="checkbox" [(ngModel)]="isActive"> Profile active</label>
+      <p class="hint">A teacher profile is separate from a login account. Link an account from User Management when ready.</p>
+      <div class="actions">
+        <button class="primary" [disabled]="saving()">{{ saving() ? 'Saving…' : editingId ? 'Save profile' : 'Register teacher' }}</button>
+        @if (editingId) { <button class="quiet" type="button" (click)="resetForm()">Cancel</button> }
+      </div>
+    </form>
+  }
+  <section class="panel directory">
+    <div class="directory-head"><div><p class="eyebrow">PROFILES</p><h2>Teacher directory</h2></div></div>
+    @if (loading()) { <p class="muted">Loading teacher profiles…</p> }
+    @else if (!teachers().length) { <div class="empty"><strong>No teacher profiles yet</strong><span>Register a teacher profile before linking it to an account.</span></div> }
+    @else {
+      <div class="table-wrap"><table><thead><tr><th>Teacher</th><th>Employee number</th><th>Login account</th><th>State</th><th></th></tr></thead>
+        <tbody>@for (teacher of teachers(); track teacher.teacherId) {
+          <tr>
+            <td><strong>{{ fullName(teacher) }}</strong></td>
+            <td>{{ teacher.employeeNumber }}</td>
+            <td>{{ teacher.linkedUserId === null ? 'Not linked' : 'Linked' }}</td>
+            <td><span class="state" [class.off]="!teacher.isActive">{{ teacher.isActive ? 'Active' : 'Inactive' }}</span></td>
+            <td>@if (canWrite()) { <button class="text-link" type="button" (click)="edit(teacher)">Edit</button> }</td>
+          </tr>
+        }</tbody>
+      </table></div>
+    }
+  </section>
+</div>
