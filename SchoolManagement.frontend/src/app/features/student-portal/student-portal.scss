@@ -29,5 +29,10 @@ small, .muted { color: #657179; font-weight: 400; }
 .failed { color: #8d3027; background: #fff0ed; }
 dl { display: grid; grid-template-columns: minmax(130px, 1fr) 2fr; gap: .5rem; overflow-wrap: anywhere; } dt { font-weight: 650; } dd { margin: 0; white-space: pre-wrap; }
 blockquote { white-space: pre-wrap; margin: .8rem 0; padding: .8rem; border-left: 3px solid #147d72; }
+.profile-review-section { margin: .8rem 0; border: 1px solid #dce3e3; border-radius: 6px; background: #fff; }
+.profile-review-section > summary { padding: .7rem .85rem; border-left: 4px solid #147d72; border-radius: 5px; background: #f1f5f5; color: #12675e; cursor: pointer; font-size: 1rem; font-weight: 750; }
+.profile-review-section[open] > summary { border-bottom: 1px solid #dce3e3; border-bottom-left-radius: 0; }
+.profile-review-section > summary:focus-visible { outline: 2px solid #147d72; outline-offset: 2px; }
+.profile-review-section > dl, .profile-review-section > h4, .profile-review-section > p { margin-left: .85rem; margin-right: .85rem; }
 @media (max-width: 540px) { .portal { padding: .7rem; } .fields { grid-template-columns: 1fr; } .panel, fieldset { padding: .75rem; } dl { grid-template-columns: 1fr; } }
 @media print { .no-print, .portal > :not(.print-summary) { display: none !important; } .print-summary { display: block !important; border: 0; } .portal { padding: 0; } }
