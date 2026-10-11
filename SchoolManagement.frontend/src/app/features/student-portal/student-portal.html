@@ -1,0 +1,68 @@
+<main class="portal">
+  <header class="no-print"><p class="eyebrow">DEMO · STUDENT SELF-SERVICE</p><h1>Student portal</h1>
+  <p class="notice" role="note"><strong>FICTIONAL DEMO ONLY.</strong> No real emails, authentication, enrollment, or legal guarantee. Use only example.invalid contacts. Public demo code: <strong>12345678</strong>. Reload to reset; uploads exist only in memory and clear when a session ends.</p>
+  <p>Scenarios: new@example.invalid (missing LRN), returning@example.invalid (independently linked grades), conditional@example.invalid (failed subject), correction@example.invalid, approved@example.invalid. <a href="#/login">Staff demo sign in</a></p>
+  <p>Online enrollment applications and your own finalized grade summary. Applications require staff review; submitting does not mean enrolled.</p></header>
+  @if (error()) { <p class="alert error no-print" role="alert">{{ error() }}</p> }
+  @if (notice()) { <p class="alert success no-print" role="status">{{ notice() }}</p> }
+  @if (options() && configurationUnavailable()) { <p class="notice no-print" role="status">{{ configurationUnavailable() }} Existing tracking and own-grade access remain available.</p> }
+  @if (!api.authenticated()) {
+    <section class="panel no-print"><h2>Email verification</h2>
+    <p>Sign in using email only. Returning students should use the email linked by school staff. Grades belong to the record linked to your verified email. If no email is linked, visit the school for identity verification. LRN is collected in the application, not at login. No SMS is sent.</p>
+    <form #login="ngForm" (ngSubmit)="codeRequested() ? verify() : requestCode()">
+    <fieldset [disabled]="busy()"><div class="fields">
+    <label>Email *<input type="email" name="portalEmail" [(ngModel)]="email" required email autocomplete="email" /></label>
+    @if (codeRequested()) { <label>Public demo code *<input name="otp" [(ngModel)]="code" required pattern="[0-9]{8}" inputmode="numeric" autocomplete="one-time-code" /><small>No email is sent. Enter 12345678 to simulate access.</small></label> }
+    </div><div class="actions">
+    <button type="submit" class="primary" [disabled]="login.invalid || busy() || (!codeRequested() && cooldown() > 0)">{{ codeRequested() ? 'Simulate portal access' : 'Request demo code' }}</button>
+    @if (codeRequested()) { <button type="button" (click)="requestCode()" [disabled]="busy() || cooldown() > 0 || !email.trim()">Resend code {{ cooldown() ? '(' + cooldown() + 's)' : '' }}</button> }
+    </div></fieldset></form></section>
+  } @else {
+    <section class="panel no-print"><p>Simulated email identity (not verified): {{ api.email() }}. Session ends {{ api.expiresAt() }}.</p>
+    @if (!linked()) { <p class="notice">No fictional student record is linked to this simulated email identity. Use the staff demo linkage before existing grades are available. Do not create a duplicate returning record.</p> }
+    <div class="actions"><button type="button" (click)="startNew()" [disabled]="busy() || !!configurationUnavailable()">New application</button>
+    <button type="button" (click)="loadGrades()" [disabled]="busy()">Load own finalized grades</button>
+    <button type="button" (click)="logout()" [disabled]="busy()">End portal session</button></div></section>
+    <section class="panel no-print" [attr.aria-busy]="busy()"><h2>Own applications</h2>
+    @if (busy()) { <p role="status">Loading / saving…</p> }
+    @if (!applications().length && !busy()) { <p>No applications yet.</p> }
+    @for (app of applications(); track app.id) {
+      <article class="panel"><button type="button" (click)="open(app)" [disabled]="busy()">Application {{ app.reference }}</button>
+      <p><span class="status" [class.pending]="app.status === 'PendingReview' || app.status === 'NeedsCorrection'">{{ app.status }}</span></p>
+      <p>{{ lrnLabel(app.profile) }}</p>
+      @for (reason of app.reasons; track $index) { <p>{{ reason }}</p> }
+      </article>
+    }</section>
+    @if (editing()) {
+      @if (options(); as config) { <section class="panel no-print"><app-student-profile-form [profile]="profile" [options]="config" [saving]="busy()" [lockEnrollmentRequest]="selected() !== null" [lockEmail]="true" [submitLabel]="selected() ? 'Save corrections for review' : 'Submit application for review'" (saved)="saveProfile($event)" (dirtyChange)="dirty = $event" /></section> }
+    }
+    @if (selected(); as detail) {
+      <section class="panel no-print"><h2>Application {{ detail.reference }}</h2><p><span class="status" [class.pending]="editable(detail)">{{ detail.status }}</span> · {{ detail.studentName }}</p>
+      <p>{{ lrnLabel(detail.profile) }}</p>
+      @if (detail.enrollmentId) { <p>Fictional enrollment linked: {{ detail.enrollmentId }} — not a real enrollment.</p> }
+      @for (reason of detail.reasons; track $index) { <p>{{ reason }}</p> }
+      @if (detail.academicReview; as review) { <h3>Academic decision: {{ review.decision }}</h3><p>{{ review.studentVisibleRemarks }}</p> }
+      <div class="actions">@if (editable(detail)) { <button type="button" (click)="correct()" [disabled]="busy() || editing() || !!configurationUnavailable()">Correct / update profile</button> }
+      <button type="button" (click)="startNew(true)" [disabled]="busy() || !!configurationUnavailable()">Reuse profile for another application</button></div>
+      @if (options(); as config) { <app-application-documents [options]="config" [documents]="detail.documents" [busy]="busy()" [canUpload]="editable(detail) && !editing()" [canDownload]="true" (upload)="upload($event)" (download)="download($event)" (dirtyChange)="dirty = $event" /> }
+      @if (editable(detail)) {
+        <label>Withdrawal reason<textarea name="withdrawReason" [(ngModel)]="reason"></textarea></label><button type="button" (click)="withdraw()" [disabled]="busy() || !reason.trim()">Withdraw application</button>
+      }
+      <h3>Application history</h3>@for (entry of detail.history; track $index) { <article class="panel"><strong>{{ entry.status }}</strong><p>{{ entry.remarks }}</p><small>{{ entry.occurredAt }}</small></article> }
+      </section>
+    }
+    <section class="panel no-print"><h2>Official enrollment history</h2>
+    @if (!history().length) { <p>No linked enrollment history available.</p> }
+    @for (entry of history(); track entry.enrollmentId) { <p>{{ entry.schoolYear }} · {{ entry.gradeLevel }} · {{ entry.section }} — {{ entry.status }}</p> }</section>
+  }
+  @if (grades(); as summary) {
+    <section class="panel print-summary"><h2>{{ summary.title }}</h2>
+    <p>Student grade summary — not an official report card</p>
+    <p>{{ summary.studentName }} · LRN {{ summary.lrn }}</p><p>Generated: {{ summary.generatedAt }}</p>
+    @if (!summary.grades.length) { <p>No own finalized grades are available. Unlinked students should contact the school.</p> } @else {
+      <button type="button" class="no-print" (click)="printGrades()" [disabled]="busy()">Print own grade summary</button>
+      <div class="table-wrap"><table><caption>Own finalized grades only</caption><thead><tr><th scope="col">School year / Grade level</th><th scope="col">Period</th><th scope="col">Subject</th><th scope="col">Grade</th><th scope="col">Student-visible remarks</th></tr></thead>
+      <tbody>@for (grade of summary.grades; track $index) { <tr><td>{{ grade.schoolYear }} / {{ grade.gradeLevel }}</td><td>{{ grade.gradingPeriod }}</td><td>{{ grade.subject }}</td><td>{{ grade.grade ?? 'Incomplete' }}</td><td>{{ grade.remarks }}</td></tr> }</tbody></table></div>
+    }</section>
+  }
+</main>

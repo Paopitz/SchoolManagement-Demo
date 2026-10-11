@@ -1,19 +1,23 @@
 <section class="heading"><div><p class="eyebrow">STUDENT RECORDS</p><h1>Students</h1><p>Search, maintain, and review student identity records.</p></div><button class="quiet" type="button" (click)="load()" [disabled]="loading()">Refresh</button></section>
 @if (error()) { <div class="alert error" role="alert">{{ error() }}</div> } @if (notice()) { <div class="alert success" role="status">{{ notice() }}</div> }
-<div class="student-layout">
-  @if (canWrite()) {
-    <form class="panel form" (ngSubmit)="save()"><p class="eyebrow">{{ editingId ? 'EDIT RECORD' : 'NEW RECORD' }}</p><h2>{{ editingId ? 'Update student' : 'Register student' }}</h2>
+<div class="panel registration-info">
+  <p>New students are registered automatically when their enrollment application is approved. Do not register them separately here. Select Edit in the directory to correct an existing student record.</p>
+  @if (canOpenApplications()) { <a class="quiet" routerLink="/enrollment-applications">Open enrollment applications</a> }
+</div>
+<div class="student-layout" [class.editing]="canWrite() && editingId">
+  @if (canWrite() && editingId) {
+    <form class="panel form" (ngSubmit)="save()"><p class="eyebrow">EDIT RECORD</p><h2>Update student</h2>
       <label>Student number<input name="studentNumber" [(ngModel)]="studentNumber" required maxlength="50"></label>
       <label>LRN<input name="lrn" [(ngModel)]="lrn" maxlength="20"></label>
       <div class="two"><label>First name<input name="firstName" [(ngModel)]="firstName" required maxlength="100"></label><label>Middle name<input name="middleName" [(ngModel)]="middleName" maxlength="100"></label></div>
       <div class="two"><label>Last name<input name="lastName" [(ngModel)]="lastName" required maxlength="100"></label><label>Suffix<input name="suffix" [(ngModel)]="suffix" maxlength="20"></label></div>
       <label>Birth date<input name="birthDate" type="date" [(ngModel)]="birthDate"></label>
       @if (editingId) { <label>Status<select name="status" [(ngModel)]="status">@for (value of allowedEditStatuses(); track value) { <option [value]="value">{{ value }}</option> }</select></label><p class="hint">Transferred and Dropped statuses are managed through enrollment actions and cannot be changed here.</p> }
-      <div class="actions"><button class="primary" [disabled]="saving()">{{ saving() ? 'Saving…' : editingId ? 'Save changes' : 'Create student' }}</button>@if (editingId) { <button class="quiet" type="button" (click)="resetForm()">Cancel</button> }</div>
+      <div class="actions"><button class="primary" [disabled]="saving()">{{ saving() ? 'Saving…' : 'Save changes' }}</button><button class="quiet" type="button" (click)="resetForm()" [disabled]="saving()">Cancel</button></div>
     </form>
   }
   <section class="panel register"><div class="register-head"><div><p class="eyebrow">REGISTER</p><h2>Student directory</h2></div><div class="filters"><label>Search<input [(ngModel)]="search" (keyup.enter)="searchChanged()" placeholder="Name, LRN, number"></label><button class="quiet" type="button" (click)="searchChanged()">Search</button><label>Status<select [(ngModel)]="statusFilter" (ngModelChange)="searchChanged()"><option value="">All</option>@for (value of statuses; track value) { <option [value]="value">{{ value }}</option> }</select></label></div></div>
-    @if (loading()) { <p class="muted">Loading student records…</p> } @else if (!students().length) { <div class="empty"><strong>No students found</strong><span>Change the search or status filter.</span></div> } @else { <div class="table-wrap"><table><thead><tr><th>Student</th><th>LRN</th><th>Birth date</th><th>Status</th>@if (canWrite()) { <th></th> }</tr></thead><tbody>@for (student of students(); track student.studentId) { <tr><td><strong>{{ fullName(student) }}</strong><small>{{ student.studentNumber }}</small></td><td>{{ student.lrn || '—' }}</td><td>{{ student.birthDate || '—' }}</td><td><span class="status" [class.inactive]="student.status !== 'Active'">{{ student.status }}</span></td>@if (canWrite()) { <td><button class="text-link" type="button" (click)="edit(student)">Edit</button></td> }</tr> }</tbody></table></div>
+    @if (loading()) { <p class="muted">Loading student records…</p> } @else if (!students().length) { <div class="empty"><strong>No students found</strong><span>Change the search or status filter. New students appear here after enrollment application approval.</span></div> } @else { <div class="table-wrap"><table><thead><tr><th>Student</th><th>LRN</th><th>Birth date</th><th>Status</th>@if (canWrite()) { <th></th> }</tr></thead><tbody>@for (student of students(); track student.studentId) { <tr><td><strong>{{ fullName(student) }}</strong><small>{{ student.studentNumber }}</small></td><td>{{ student.lrn || '—' }}</td><td>{{ student.birthDate || '—' }}</td><td><span class="status" [class.inactive]="student.status !== 'Active'">{{ student.status }}</span></td>@if (canWrite()) { <td><button class="text-link" type="button" (click)="edit(student)" [disabled]="saving()">Edit</button></td> }</tr> }</tbody></table></div>
       <div class="pager"><span>{{ totalCount() }} records</span><button class="quiet" type="button" (click)="load(page() - 1)" [disabled]="page() <= 1">Previous</button><span>Page {{ page() }} of {{ maxPage() }}</span><button class="quiet" type="button" (click)="load(page() + 1)" [disabled]="page() >= maxPage()">Next</button></div>
     }
   </section>

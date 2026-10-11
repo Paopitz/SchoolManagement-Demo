@@ -1,0 +1,96 @@
+<nav aria-label="Profile steps" class="steps">
+  @for (label of steps; track label; let i = $index) { <span [attr.aria-current]="step() === i ? 'step' : null">{{ i + 1 }}. {{ label }}</span> }
+</nav>
+@if (error()) { <p class="alert error" role="alert">{{ error() }}</p> }
+<form #form="ngForm" (ngSubmit)="save(form)" (input)="changed()" (change)="changed()" novalidate>
+<fieldset [disabled]="saving">
+<h2 id="profile-step-heading" tabindex="-1">{{ steps[step()] }}</h2>
+@if (step() === 0) {
+  <p>Use full names and spelling from the PSA / Live Birth document. LRN is an identifier, not a password.</p>
+  <div class="fields">
+    <label>Application type *<select name="applicationType" [(ngModel)]="profile.applicationType" (ngModelChange)="applicationTypeChanged()" required [disabled]="lockEnrollmentRequest"><option>New</option><option>Returning</option><option>Transferee</option></select></label>
+    <label>LRN status *<select name="lrnStatus" [(ngModel)]="profile.lrnStatus" required [disabled]="lockEnrollmentRequest || profile.applicationType !== 'New'"><option value="Provided">Provided</option><option value="NotAssigned">Not assigned</option><option value="Unknown">Unknown</option></select></label>
+    <label>LRN {{ profile.lrnStatus === 'Provided' ? '*' : '(leave blank)' }}<input name="lrn" [(ngModel)]="profile.lrn" inputmode="numeric" pattern="[0-9]{12}" [required]="profile.lrnStatus === 'Provided'" [readonly]="lockEnrollmentRequest" aria-describedby="lrn-help" /><small id="lrn-help">Provided: exactly 12 digits, including leading zeroes. Only New applicants may leave LRN blank with Not assigned / Unknown. Returning and Transferee require a valid LRN.</small></label>
+    @if (lockEnrollmentRequest) { <p>Submitted LRN and status cannot be changed in profile corrections. Contact staff for verified LRN resolution.</p> }
+    <label>Last name *<input name="lastName" [(ngModel)]="profile.lastName" required autocomplete="family-name" /></label>
+    <label>First name *<input name="firstName" [(ngModel)]="profile.firstName" required autocomplete="given-name" /></label>
+    <label>Middle name<input name="middleName" [(ngModel)]="profile.middleName" autocomplete="additional-name" /></label>
+    <label>Extension name<input name="extensionName" [(ngModel)]="profile.extensionName" /></label>
+    <label>Sex *<select name="sex" [(ngModel)]="profile.sex" required><option value="">Select</option><option value="M">Male</option><option value="F">Female</option></select></label>
+    <label>Birth date *<input type="date" name="birthDate" [(ngModel)]="profile.birthDate" required /><small>Computed age: {{ age() ?? 'Enter a valid birth date' }}</small></label>
+    <label>Email *<input type="email" name="email" [(ngModel)]="profile.email" required email autocomplete="email" [readonly]="lockEmail" /><small>Verification uses email OTP. No SMS is sent.</small></label>
+    <label>Mobile *<input type="tel" name="mobile" [(ngModel)]="profile.mobile" required autocomplete="tel" /></label>
+    @for (contact of profile.contacts; track $index; let i = $index) {
+      <label>Additional contact {{ i + 1 }}<input type="tel" [name]="'contact' + i" [(ngModel)]="profile.contacts[i]" /></label>
+    }
+  </div>
+  <div class="checks">
+    <label><input type="checkbox" name="withParents" [(ngModel)]="profile.livingWithParents" /> Living with parents</label>
+    <label><input type="checkbox" name="withGuardian" [(ngModel)]="profile.livingWithGuardian" /> Living with guardian (relationship in Family step)</label>
+    <label><input type="checkbox" name="boarding" [(ngModel)]="profile.boardingHouse" /> Living in a boarding house</label>
+  </div>
+  @if (profile.boardingHouse) {
+    <div class="fields"><label>Landlady / landlord first name *<input name="landlordFirstName" [(ngModel)]="profile.landlordFirstName" required /></label>
+    <label>Landlady / landlord last name *<input name="landlordLastName" [(ngModel)]="profile.landlordLastName" required /></label>
+    <label>Landlady / landlord contact *<input type="tel" name="landlordContact" [(ngModel)]="profile.landlordContact" required /></label></div>
+    <app-profile-address [address]="profile.landlordAddress" prefix="landlord" title="Landlady / landlord address" />
+  }
+  <app-profile-address [address]="profile.presentAddress" prefix="present" title="Present address" />
+  <label class="check"><input type="checkbox" name="sameAddress" [(ngModel)]="sameAddress" (ngModelChange)="copyAddress()" /> Permanent address same as present (copied on save)</label>
+  <app-profile-address [address]="profile.permanentAddress" prefix="permanent" title="Permanent address" [readonly]="sameAddress" />
+  <label class="check"><input type="checkbox" name="fourPs" [(ngModel)]="profile.fourPsBeneficiary" /> 4Ps beneficiary</label>
+  @if (profile.fourPsBeneficiary) { <label>4Ps household number *<input name="household" [(ngModel)]="profile.fourPsHouseholdNumber" required /></label> }
+}
+@if (step() === 1) {
+  <app-profile-family [member]="profile.mother" title="Mother" prefix="mother" />
+  <app-profile-family [member]="profile.father" title="Father" prefix="father" />
+  <app-profile-family [member]="profile.guardian" title="Guardian" prefix="guardian" />
+  <label>Person to appear on ID *<select name="idContact" [(ngModel)]="profile.idContact" required><option value="">Select</option><option value="Mother">Mother</option><option value="Father">Father</option><option value="Guardian">Guardian</option></select></label>
+}
+@if (step() === 2) {
+  <p>Requested placement is subject to manual academic review. Grades do not automatically promote or reject an applicant.</p>
+  <label class="check"><input type="checkbox" name="hasPreviousSchooling" [(ngModel)]="profile.hasPreviousSchooling" /> Has previous schooling</label>
+  <div class="fields">
+    <label>Previous school (full name)<input name="previousSchool" [(ngModel)]="profile.previousSchoolName" /></label>
+    <label>Previous school address<input name="previousSchoolAddress" [(ngModel)]="profile.previousSchoolAddress" /></label>
+    <label>Previous school ID<input name="previousSchoolId" [(ngModel)]="profile.previousSchoolId" /></label>
+    <label>Previous school year<input name="previousYear" [(ngModel)]="profile.previousSchoolYear" /></label>
+    <label>Previous grade level<input name="previousGrade" [(ngModel)]="profile.previousGradeLevel" /></label>
+    <label>Requested school year *<select name="requestedYear" [(ngModel)]="profile.requestedSchoolYearId" required [disabled]="lockEnrollmentRequest"><option [ngValue]="null">Select</option>@for (year of options.schoolYears; track year.id) { <option [ngValue]="year.id">{{ year.name }}</option> }</select></label>
+    <label>Requested grade level *<select name="requestedGrade" [(ngModel)]="profile.requestedGradeLevelId" required [disabled]="lockEnrollmentRequest"><option [ngValue]="null">Select</option>@for (grade of options.gradeLevels; track grade.id) { <option [ngValue]="grade.id">{{ grade.name }}</option> }</select></label>
+  </div>
+  @if (lockEnrollmentRequest) { <p>Application type and placement request cannot be changed by the profile correction endpoint. Contact staff or withdraw and create a new application under school policy.</p> }
+  <label class="check"><input type="checkbox" name="completedGrade10" [(ngModel)]="profile.completedGrade10" /> Completed Grade 10 (general average applicable)</label>
+  @if (profile.completedGrade10) { <label>Grade 10 general average (student-declared, not verified subject grades)<input type="number" step="any" name="grade10Average" [(ngModel)]="profile.grade10GeneralAverage" /></label> }
+}
+@if (step() === 3) {
+  @if (canEditHealth) {
+    <p>Optional restricted health information. Student identity and computed age are reused from Personal.</p>
+    <label class="check"><input type="checkbox" name="includeHealth" [ngModel]="profile.health !== null" (ngModelChange)="toggleHealth($event)" /> Provide optional health details</label>
+    @if (profile.health; as health) {
+      <div class="fields">
+        <label>Blood type<select name="bloodType" [(ngModel)]="health.bloodType"><option>Unknown</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select></label>
+        <label>Height (centimeters)<input type="number" min="0.01" step="any" name="height" [(ngModel)]="health.heightCm" /></label>
+        <label>Weight (kilograms)<input type="number" min="0.01" step="any" name="weight" [(ngModel)]="health.weightKg" /></label>
+        <label>Date of weighing<input type="date" name="weighingDate" [(ngModel)]="health.weighingDate" /></label>
+      </div>
+      <label>Diseases, illnesses, or other health conditions<textarea name="healthHistory" [(ngModel)]="health.history"></textarea></label>
+    }
+  } @else { <p>Health details require separate permission and are not included in this form.</p> }
+}
+@if (step() === 4) {
+  <p class="notice">{{ options.privacyNotice }}</p>
+  <blockquote>{{ options.declarationText }}</blockquote>
+  <p>Declaration version: {{ options.declarationVersion || 'Not available — submission disabled' }}. A checkbox does not replace a sworn signature. Follow school instructions for any signed printout.</p>
+  <label class="check"><input type="checkbox" name="declaration" [(ngModel)]="profile.declarationAcknowledged" required /> I acknowledge the declaration above. *</label>
+  <div class="fields"><label>Accomplishing person's full name *<input name="accomplishingName" [(ngModel)]="profile.accomplishingPersonName" required /></label>
+  <label>Capacity *<select name="capacity" [(ngModel)]="profile.accomplishingCapacity" required><option value="">Select</option><option>Student</option><option>Parent</option><option>Guardian</option></select></label></div>
+  <p>Submitting creates a pending application. Then provide the required documents for staff review. An application is not an official enrollment.</p>
+}
+<div class="actions">
+  @if (step() > 0) { <button type="button" (click)="move(form, -1)">Back</button> }
+  @if (step() < steps.length - 1) { <button type="button" class="primary" (click)="move(form, 1)">Next</button> }
+  @else { <button type="submit" class="primary" [disabled]="saving || !options.declarationVersion">{{ saving ? 'Saving…' : submitLabel }}</button> }
+</div>
+</fieldset>
+</form>

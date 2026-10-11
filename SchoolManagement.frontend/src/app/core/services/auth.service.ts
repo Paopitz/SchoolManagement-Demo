@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, signal } from '@angular/core';
-import { Observable, tap } from 'rxjs';
+import { Observable, catchError, map, switchMap, tap, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { CurrentUser, LoginRequest, TokenResponse } from '../models/auth.models';
 
@@ -15,7 +15,8 @@ interface StoredSession {
 }
 
 /**
- * Stores the fictional demo session separately from the production application's session.
+ * Owns JWT session state for the browser tab. Tokens are kept in sessionStorage only
+ * (not localStorage) since this app runs on shared school LAN desktops.
  */
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -23,13 +24,18 @@ export class AuthService {
 
   readonly currentUser = computed(() => this.session()?.user ?? null);
   readonly isAuthenticated = computed(() => this.session() !== null);
+  readonly permissions = computed(() => this.currentUser()?.permissions ?? []);
 
   constructor(private readonly http: HttpClient) {}
 
   login(request: LoginRequest): Observable<TokenResponse> {
     return this.http
       .post<TokenResponse>(`${environment.apiBaseUrl}/auth/login`, request)
-      .pipe(tap((response) => this.storeSession(response)));
+      .pipe(
+        tap((response) => this.storeSession(response)),
+        switchMap((response) => this.refreshPermissions().pipe(map(() => response))),
+        catchError((error: unknown) => { this.clearSession(); return throwError(() => error); }),
+      );
   }
 
   refresh(): Observable<TokenResponse> {
@@ -57,6 +63,22 @@ export class AuthService {
     return this.session()?.refreshToken ?? null;
   }
 
+  hasPermission(code: string): boolean {
+    return this.isAuthenticated() && this.permissions().includes(code);
+  }
+
+  refreshPermissions(): Observable<string[]> {
+    return this.http.get<string[]>(`${environment.apiBaseUrl}/auth/permissions`).pipe(
+      tap((permissions) => {
+        const session = this.session();
+        if (!session) return;
+        const updated = { ...session, user: { ...session.user, permissions } };
+        this.session.set(updated);
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      }),
+    );
+  }
+
   hasAnyRole(roles: readonly string[]): boolean {
     if (roles.length === 0) {
       return true;
@@ -71,7 +93,7 @@ export class AuthService {
       accessTokenExpiresAtUtc: response.accessTokenExpiresAtUtc,
       refreshToken: response.refreshToken,
       refreshTokenExpiresAtUtc: response.refreshTokenExpiresAtUtc,
-      user: { userId: response.userId, username: response.username, roles: response.roles },
+      user: { userId: response.userId, username: response.username, roles: response.roles, permissions: this.permissions() },
     };
     this.session.set(stored);
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(stored));

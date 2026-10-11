@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { Enrollment, SchoolYear, Section, SectionSubject, Student } from '../../core/models/phase2.models';
 import { Phase2ApiService } from '../../core/services/phase2-api.service';
 import { apiErrorMessage } from '../../core/utils/api-error-message';
@@ -8,14 +9,15 @@ import { AuthService } from '../../core/services/auth.service';
 @Component({
   selector: 'app-enrollment',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, RouterLink],
   templateUrl: './enrollment.html',
   styleUrl: './enrollment.scss',
 })
 export class EnrollmentPage implements OnInit {
   private readonly api = inject(Phase2ApiService);
   private readonly auth = inject(AuthService);
-  readonly canWrite = () => this.auth.hasAnyRole(['Super Admin', 'Admin', 'Registrar']);
+  readonly canWrite = () => this.auth.hasPermission('enrollment.write');
+  readonly canConfirm = () => this.auth.hasPermission('enrollment.confirm');
   readonly enrollments = signal<Enrollment[]>([]);
   readonly students = signal<Student[]>([]);
   readonly schoolYears = signal<SchoolYear[]>([]);

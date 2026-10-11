@@ -1,15 +1,17 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { Phase3ApiService } from '../../core/services/phase3-api.service';
 import { StudentRecord } from '../../core/models/phase3.models';
 import { apiErrorMessage } from '../../core/utils/api-error-message';
 
-@Component({ selector: 'app-students', standalone: true, imports: [FormsModule], templateUrl: './students.html', styleUrl: './students.scss' })
+@Component({ selector: 'app-students', standalone: true, imports: [FormsModule, RouterLink], templateUrl: './students.html', styleUrl: './students.scss' })
 export class StudentsPage implements OnInit {
   private readonly api = inject(Phase3ApiService);
   private readonly auth = inject(AuthService);
-  readonly canWrite = () => this.auth.hasAnyRole(['Super Admin', 'Admin', 'Registrar']);
+  readonly canWrite = () => this.auth.hasPermission('students.write');
+  readonly canOpenApplications = () => this.auth.hasPermission('enrollment.read');
   readonly students = signal<StudentRecord[]>([]);
   readonly page = signal(1);
   readonly totalCount = signal(0);
@@ -49,17 +51,19 @@ export class StudentsPage implements OnInit {
   }
 
   save(): void {
+    if (!this.editingId || !this.canWrite()) {
+      this.error.set('Select an existing student to edit. New students are registered automatically after enrollment application approval.');
+      return;
+    }
     this.error.set(''); this.notice.set(''); this.saving.set(true);
     const payload = {
       studentNumber: this.studentNumber.trim(), lrn: this.lrn.trim() || null, firstName: this.firstName.trim(),
       middleName: this.middleName.trim() || null, lastName: this.lastName.trim(), suffix: this.suffix.trim() || null,
       birthDate: this.birthDate || null,
     };
-    const request = this.editingId
-      ? this.api.updateStudent(this.editingId, { ...payload, status: this.status })
-      : this.api.createStudent(payload);
+    const request = this.api.updateStudent(this.editingId, { ...payload, status: this.status });
     request.subscribe({
-      next: () => { this.saving.set(false); this.notice.set(this.editingId ? 'Student record updated.' : 'Student record created.'); this.resetForm(); this.load(); },
+      next: () => { this.saving.set(false); this.notice.set('Student record updated.'); this.resetForm(); this.load(); },
       error: (error) => { this.saving.set(false); this.showError(error); },
     });
   }

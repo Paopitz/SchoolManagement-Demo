@@ -10,6 +10,8 @@ const PUBLIC_PATHS = ['/auth/login', '/auth/refresh'];
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const authService = inject(AuthService);
   const router = inject(Router);
+  // Student portal uses a separate scoped session and must never refresh or clear staff credentials.
+  if (req.url.includes('/student-portal/')) return next(req);
   const isPublic = PUBLIC_PATHS.some((path) => req.url.includes(path));
 
   const accessToken = authService.getAccessToken();

@@ -44,15 +44,17 @@ describe('AuthService', () => {
     const req = httpMock.expectOne(`${environment.apiBaseUrl}/auth/login`);
     expect(req.request.method).toBe('POST');
     req.flush(tokenResponse);
+    httpMock.expectOne(`${environment.apiBaseUrl}/auth/permissions`).flush(['students.read']);
 
     expect(service.isAuthenticated()).toBe(true);
-    expect(service.currentUser()).toEqual({ userId: 1, username: 'jdoe', roles: ['Registrar'] });
+    expect(service.currentUser()).toEqual({ userId: 1, username: 'jdoe', roles: ['Registrar'], permissions: ['students.read'] });
     expect(service.getAccessToken()).toBe('access-token');
   });
 
   it('clears the session on logout', () => {
     service.login({ username: 'jdoe', password: 'secret' }).subscribe();
     httpMock.expectOne(`${environment.apiBaseUrl}/auth/login`).flush(tokenResponse);
+    httpMock.expectOne(`${environment.apiBaseUrl}/auth/permissions`).flush([]);
 
     service.logout().subscribe();
     httpMock.expectOne(`${environment.apiBaseUrl}/auth/logout`).flush(null);
@@ -63,6 +65,7 @@ describe('AuthService', () => {
   it('matches roles case-insensitively and allows empty role lists', () => {
     service.login({ username: 'jdoe', password: 'secret' }).subscribe();
     httpMock.expectOne(`${environment.apiBaseUrl}/auth/login`).flush(tokenResponse);
+    httpMock.expectOne(`${environment.apiBaseUrl}/auth/permissions`).flush([]);
 
     expect(service.hasAnyRole([])).toBe(true);
     expect(service.hasAnyRole(['registrar'])).toBe(true);

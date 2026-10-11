@@ -140,7 +140,7 @@ describe('Standalone demo integration', () => {
     ).toEqual([]);
   });
 
-  it('creates and edits students and keeps enrollment display names consistent', async () => {
+  it('rejects standalone creation, edits existing students and keeps enrollment names consistent', async () => {
     const payload = {
       studentNumber: 'DEMO-NEW',
       lrn: null,
@@ -150,11 +150,12 @@ describe('Standalone demo integration', () => {
       suffix: null,
       birthDate: null,
     };
-    const student = await firstValueFrom(phase3.createStudent(payload));
+    await expect(firstValueFrom(phase3.createStudent(payload))).rejects.toMatchObject({ status: 409 });
+    const student = data.students[0];
     expect(student.status).toBe('Active');
     await firstValueFrom(
       phase3.updateStudent(student.studentId, {
-        ...payload,
+        ...student,
         firstName: 'Edited',
         status: 'Active',
       }),
@@ -275,8 +276,8 @@ describe('Standalone demo integration', () => {
     ).toBe('Edited Track');
   });
 
-  it('creates, edits, confirms and drops enrollment and rejects invalid transitions', async () => {
-    const enrollment = await firstValueFrom(
+  it('blocks legacy creation/confirmation and preserves historical transitions', async () => {
+    await expect(firstValueFrom(
       phase2.createEnrollment({
         studentId: 11,
         schoolYearId: 1,
@@ -284,8 +285,8 @@ describe('Standalone demo integration', () => {
         enrollmentType: 'New',
         sectionSubjectIds: [1, 2, 3],
       }),
-    );
-    expect(enrollment.status).toBe('Pending');
+    )).rejects.toMatchObject({ status: 409 });
+    const enrollment = data.enrollments.find(e => e.status === 'Pending')!;
     await firstValueFrom(
       phase2.updateEnrollment(enrollment.enrollmentId, {
         sectionId: 1,
@@ -293,16 +294,13 @@ describe('Standalone demo integration', () => {
         sectionSubjectIds: [1, 2],
       }),
     );
-    expect(
-      (await firstValueFrom(phase2.enrollmentAction(enrollment.enrollmentId, 'confirm'))).status,
-    ).toBe('Enrolled');
     await expect(
       firstValueFrom(phase2.enrollmentAction(enrollment.enrollmentId, 'confirm')),
     ).rejects.toMatchObject({ status: 409 });
     expect(
       (
         await firstValueFrom(
-          phase2.enrollmentAction(enrollment.enrollmentId, 'drop', 'Sample reason'),
+          phase2.enrollmentAction(1, 'drop', 'Sample reason'),
         )
       ).status,
     ).toBe('Dropped');
@@ -312,7 +310,7 @@ describe('Standalone demo integration', () => {
     expect(
       (await firstValueFrom(phase2.enrollmentAction(2, 'transfer', 'Sample reason'))).status,
     ).toBe('Transferred');
-    expect((await firstValueFrom(phase2.getEnrollmentHistory(11))).enrollments).toHaveLength(1);
+    expect((await firstValueFrom(phase2.getEnrollmentHistory(1))).enrollments).toHaveLength(1);
   });
 
   it('creates, edits, and deletes schedules and rejects overlaps', async () => {
@@ -561,7 +559,7 @@ describe('Standalone demo integration', () => {
   it('derives reports from changed arrays and exports real CSV and HTML blobs locally', async () => {
     const before = await firstValueFrom(phase3.getEnrollmentSummary(1));
     const pending = before.find((row) => row.status === 'Pending')!.count;
-    await firstValueFrom(phase2.enrollmentAction(10, 'confirm'));
+    await firstValueFrom(phase2.enrollmentAction(10, 'cancel', 'Fictional cancellation'));
     const after = await firstValueFrom(phase3.getEnrollmentSummary(1));
     expect(after.find((row) => row.status === 'Pending')?.count ?? 0).toBe(pending - 1);
     const csv = await firstValueFrom(phase36.exportEnrollment(1, 'csv'));

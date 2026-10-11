@@ -12,6 +12,8 @@ import { Enrollment, Section, SectionSubject } from '../models/phase2.models';
 import { AttendanceSummaryRow, EnrollmentSummaryRow, ManagedUser } from '../models/phase3.models';
 import { GradeRecord } from '../models/phase36.models';
 import { DemoData, localDate } from './demo-data';
+import { DemoEnrollment } from './demo-enrollment';
+import { DemoPermissions } from './demo-permissions';
 
 const ADMIN = ['Super Admin', 'Admin'];
 const REGISTRAR = [...ADMIN, 'Registrar'];
@@ -93,16 +95,46 @@ class Body {
 @Injectable()
 export class DemoBackend implements HttpBackend {
   private readonly data = inject(DemoData);
+  private readonly enrollment = inject(DemoEnrollment);
+  private readonly permissions = inject(DemoPermissions);
 
   handle(request: HttpRequest<unknown>): Observable<HttpEvent<unknown>> {
-    return defer(() => {
+    return defer(async () => {
       if (!request.url.startsWith('/demo-api/'))
         fail(404, 'External requests are disabled in this standalone demo.');
       const path = request.url.slice('/demo-api/'.length).split('?')[0].split('/');
+      if (path[0] === 'auth' && path[1] === 'permissions' && request.method === 'GET')
+        return new HttpResponse({ status: 200, body: this.permissions.effective(this.user(request)) });
+      if (['student-portal', 'enrollment-applications', 'role-permissions'].includes(path[0])) {
+        const result = await this.enrollment.dispatch(request, path, path[0] === 'student-portal' ? undefined : this.user(request));
+        this.syncRelations();
+        return new HttpResponse({ status: 200, body: result instanceof Blob ? result : structuredClone(result) });
+      }
+      if (path[0] !== 'auth') {
+        const user = this.user(request);
+        const writing = request.method !== 'GET';
+        const permission: Record<string, string> = {
+          students: writing ? 'students.write' : 'students.read',
+          enrollments: writing ? 'enrollment.write' : 'enrollment.read',
+          users: 'users.manage', roles: 'users.manage', teachers: 'users.manage',
+          academic: writing ? 'academic.write' : 'academic.read',
+          sections: writing ? 'academic.write' : 'academic.read',
+          schedules: writing ? 'schedule.write' : 'schedule.read',
+          attendance: writing ? 'attendance.write' : 'attendance.read',
+          grading: writing ? 'grading.write' : 'grading.read',
+          reports: 'reports.read', dashboard: 'reports.read',
+          'system-settings': writing ? 'system-settings.write' : 'system-settings.read',
+        };
+        if (permission[path[0]]) this.enrollment.require(user, permission[path[0]]);
+        if (path[0] === 'students' && request.method === 'POST')
+          fail(409, 'Create a reviewed demo application instead of a standalone student.');
+        if (path[0] === 'enrollments' && (request.method === 'POST' && path.length === 1 || path[2] === 'confirm'))
+          fail(409, 'Use demo application review and approval. Direct enrollment is disabled.');
+      }
       const result = this.dispatch(request, path, new Body(request.body));
       this.syncRelations();
       const body = result instanceof Blob ? result : structuredClone(result);
-      return of(new HttpResponse({ status: 200, body, url: request.urlWithParams }));
+      return new HttpResponse({ status: 200, body, url: request.urlWithParams });
     });
   }
 
@@ -116,7 +148,7 @@ export class DemoBackend implements HttpBackend {
 
     switch (resource) {
       case 'students': {
-        if (writing) this.allow(user, REGISTRAR);
+        if (writing) this.enrollment.require(user, 'students.write');
         if (id !== undefined && action === 'enrollment-history' && method === 'GET') {
           const student = this.find(this.data.students, (row) => row.studentId === id);
           return {
@@ -537,7 +569,7 @@ export class DemoBackend implements HttpBackend {
 
   private auth(method: string, action: string, body: Body): TokenResponse | null {
     if (method !== 'POST') fail(404, 'Unsupported demo authentication request.');
-    if (action === 'logout') return null;
+    if (action === 'logout') { this.enrollment.clearFiles(); return null; }
     let user: ManagedUser;
     if (action === 'login') {
       const username = body.text('username');

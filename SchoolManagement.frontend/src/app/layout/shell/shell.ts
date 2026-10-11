@@ -15,7 +15,7 @@ export class Shell {
   private readonly router = inject(Router);
 
   readonly currentUser = this.authService.currentUser;
-  readonly visibleNavItems = computed(() => NAV_ITEMS.filter((item) => this.authService.hasAnyRole(item.roles)));
+  readonly visibleNavItems = computed(() => NAV_ITEMS.filter((item) => this.authService.hasPermission(item.permission)));
 
   logout(): void {
     this.authService.logout().subscribe({

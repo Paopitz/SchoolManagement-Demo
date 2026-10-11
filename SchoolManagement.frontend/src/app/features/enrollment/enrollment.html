@@ -1,5 +1,5 @@
 <section class="page-heading">
-  <div><p class="eyebrow">REGISTRAR WORKSPACE</p><h1>Enrollment</h1><p>Review pending requests, enroll students, and inspect year-by-year history.</p></div>
+  <div><p class="eyebrow">REGISTRAR WORKSPACE</p><h1>Enrollment register</h1><p>Inspect official enrollment records and year-by-year history.</p><a routerLink="/enrollment-applications">Open applications for manual registration, document review, and enrollment approval</a></div>
   <button class="secondary" type="button" (click)="loadEnrollments()" [disabled]="loading()">Refresh</button>
 </section>
 
@@ -7,7 +7,7 @@
 @if (notice()) { <div class="alert success" role="status">{{ notice() }}</div> }
 
 <section class="workspace-grid">
-  @if (canWrite()) {
+  @if (canWrite() && editingEnrollmentId) {
   <section class="panel enrollment-form">
     <div class="panel-title"><div><p class="eyebrow">{{ editingEnrollmentId ? 'EDIT PENDING RECORD' : 'NEW RECORD' }}</p><h2>{{ editingEnrollmentId ? 'Update enrollment' : 'Create enrollment' }}</h2></div><span class="step">01 / 03</span></div>
     <div class="field student-picker">
@@ -23,7 +23,7 @@
     <div class="field"><label for="type">Enrollment type</label><select id="type" [(ngModel)]="enrollmentType"><option>New</option><option>Returning</option><option>Transferee</option></select></div>
     @if (offerings().length) {
       <fieldset class="subjects"><legend>Subjects · {{ selectedSubjectIds.length }} selected</legend>@for (subject of offerings(); track subject.sectionSubjectId) { <label class="check-row"><input type="checkbox" [checked]="selectedSubjectIds.includes(subject.sectionSubjectId)" (change)="toggleSubject(subject.sectionSubjectId, $any($event.target).checked)"><span>{{ subject.subjectCode }} · {{ subject.subjectName }}</span><small>{{ subject.teacherName || 'Teacher unassigned' }}</small></label> }</fieldset>
-    } @else if (sectionId) { <p class="muted">No active subject offerings are assigned to this section. Add offerings in Academic setup before creating a demo enrollment.</p> }
+    } @else if (sectionId) { <p class="muted">No active subject offerings are assigned to this section. The backend can default subjects only when offerings exist.</p> }
     <div class="form-actions"><button class="primary" type="button" (click)="createEnrollment()" [disabled]="saving()">{{ saving() ? 'Saving…' : editingEnrollmentId ? 'Save pending changes' : 'Create pending enrollment' }}</button>@if (editingEnrollmentId) { <button class="secondary" type="button" (click)="cancelEdit()">Stop editing</button> }</div>
   </section>
   }
@@ -36,7 +36,8 @@
       <div class="table-wrap"><table><thead><tr><th>Student</th><th>School year / section</th><th>Type</th><th>Status</th><th>Actions</th></tr></thead><tbody>
         @for (item of enrollments(); track item.enrollmentId) {
           <tr><td><strong>{{ item.studentName }}</strong><small>{{ item.studentNumber }}</small><button class="text-button" type="button" (click)="openHistory(item.studentId)">View history</button></td><td>{{ item.schoolYearCode }}<small>{{ item.gradeLevelName }} · {{ item.sectionName }}</small></td><td>{{ item.enrollmentType }}</td><td><span class="status" [class.pending]="item.status === 'Pending'">{{ item.status }}</span></td><td class="actions">
-            @if (canWrite() && item.status === 'Pending') { <button class="text-button" type="button" (click)="editEnrollment(item)">Edit</button><button class="text-button" type="button" (click)="act(item, 'confirm')" [disabled]="saving()">Confirm</button><button class="text-button danger-text" type="button" (click)="activeActionId = item.enrollmentId">Cancel</button> }
+            @if (canWrite() && item.status === 'Pending') { <button class="text-button" type="button" (click)="editEnrollment(item)">Edit</button><button class="text-button danger-text" type="button" (click)="activeActionId = item.enrollmentId">Cancel</button> }
+            @if (canConfirm() && item.status === 'Pending') { <button class="text-button" type="button" (click)="act(item, 'confirm')" [disabled]="saving()">Confirm</button> }
             @if (canWrite() && item.status === 'Enrolled') { <button class="text-button" type="button" (click)="activeActionId = item.enrollmentId">Transfer / drop</button> }
             @if (canWrite() && activeActionId === item.enrollmentId) { <div class="action-reason"><input [attr.aria-label]="'Reason for ' + item.studentName" [(ngModel)]="actionReason" placeholder="Reason required"><button class="text-button" type="button" (click)="act(item, item.status === 'Pending' ? 'cancel' : 'transfer')">{{ item.status === 'Pending' ? 'Apply cancel' : 'Transfer' }}</button>@if (item.status === 'Enrolled') { <button class="text-button danger-text" type="button" (click)="act(item, 'drop')">Drop</button> }</div> }
           </td></tr>

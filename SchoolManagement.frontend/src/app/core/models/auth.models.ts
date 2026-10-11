@@ -17,6 +17,7 @@ export interface CurrentUser {
   userId: number;
   username: string;
   roles: string[];
+  permissions?: string[];
 }
 
 export interface ProblemDetailsResponse {

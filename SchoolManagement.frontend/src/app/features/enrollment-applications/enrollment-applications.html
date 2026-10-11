@@ -1,0 +1,140 @@
+<main>
+  <header><p class="eyebrow">DEMO · ENROLLMENT OPERATIONS</p><h1>Enrollment applications</h1><p>Review fictional online and staff-assisted applications. The in-memory demo adapter enforces review, version, and effective permissions; nothing enrolls a real student.</p>
+  <p class="notice">Presentation scenarios: Nova — New / missing LRN; Amelia — independently linked returning grades; Cedar — failed subject / conditional exception; Robin — NeedsCorrection; Ben — Approved (change status filter). Use synthetic data only.</p></header>
+  @if (error()) { <p class="alert error" role="alert">{{ error() }}</p> }
+  @if (notice()) { <p class="alert success" role="status">{{ notice() }}</p> }
+  @if (configurationUnavailable()) { <p class="notice" role="status">{{ configurationUnavailable() }} Existing application review remains available.</p> }
+  @if (!can('enrollment.read')) { <p class="notice">You do not have permission to view the application queue.</p> }
+  @if (can('enrollment.write')) { <button type="button" class="primary" (click)="startManual()" [disabled]="saving() || !!configurationUnavailable()">Create staff-assisted application</button> }
+  @if (can('enrollment.write')) {
+    <details class="panel"><summary>Staff-verified existing student / email linkage</summary>
+    <p>For legacy returning students, independently verify the student's identity and email ownership in person. LRN alone is not verification. This operation links an existing student; it does not create a staff or student JWT.</p>
+    <form #linkForm="ngForm" (ngSubmit)="provisionLink()" (input)="linkDirty = true" (change)="linkDirty = true"><fieldset [disabled]="saving()"><div class="fields">
+    <label>Existing student ID *<input type="number" min="1" step="1" name="linkStudentId" [(ngModel)]="linkStudentId" required /></label>
+    <label>Independently verified email *<input type="email" name="linkEmail" [(ngModel)]="linkEmail" required email autocomplete="off" /></label></div>
+    <label>Identity / email verification reason *<textarea name="linkReason" [(ngModel)]="linkReason" required maxlength="500"></textarea></label>
+    <label class="check"><input type="checkbox" name="identityVerified" [(ngModel)]="identityVerified" required /> I independently verified this existing student's identity.</label>
+    <label class="check"><input type="checkbox" name="emailOwnershipVerified" [(ngModel)]="emailOwnershipVerified" required /> I independently verified ownership of the specified email.</label>
+    <button type="submit" [disabled]="saving() || linkForm.invalid">Link verified email to existing student</button>
+    <p>Use the matching existing LRN and this email in the full manual profile form. The server applies linkage and duplicate/conflict checks; an entered student ID alone is not an application-creation shortcut.</p>
+    </fieldset></form></details>
+  }
+  @if (can('enrollment.read')) {
+    <section class="panel" [attr.aria-busy]="loading()">
+    <h2>Application queue</h2>
+    <form (ngSubmit)="load(1)" class="filters">
+    <label>Status<select name="statusFilter" [(ngModel)]="status"><option value="">All statuses</option><option value="PendingReview">Pending review</option><option value="NeedsCorrection">Needs correction</option><option value="Approved">Approved</option><option value="Rejected">Rejected</option><option value="Withdrawn">Withdrawn</option></select></label>
+    <label>School year<select name="yearFilter" [(ngModel)]="schoolYearId"><option [ngValue]="null">All school years</option>@for (year of options()?.schoolYears ?? []; track year.id) { <option [ngValue]="year.id">{{ year.name }}</option> }</select></label>
+    <button type="submit" [disabled]="loading() || saving()">Apply filters / Refresh</button>
+    </form>
+    @if (loading()) { <p role="status">Loading applications…</p> }
+    @else if (!items().length) { <p>No applications match these filters.</p> }
+    @else { <div class="table-wrap"><table><caption>Applications — page {{ page }} (25 per page)</caption><thead><tr><th scope="col">Applicant / reference</th><th scope="col">Source</th><th scope="col">Status / reasons</th><th scope="col">Action</th></tr></thead><tbody>
+    @for (item of items(); track item.id) { <tr><td>{{ item.studentName }}<br /><small>{{ item.reference }}</small></td><td>{{ item.source }}</td>
+    <td><span class="status" [class.pending]="editable(item)">{{ item.status }}</span><p>{{ lrnLabel(item.profile) }}</p>@for (reason of item.reasons; track $index) { <p>{{ reason }}</p> }</td>
+    <td><button type="button" (click)="open(item)" [disabled]="saving()">Review application</button></td></tr> }
+    </tbody></table></div> }
+    <div class="actions"><button type="button" (click)="load(page - 1)" [disabled]="page <= 1 || loading() || saving()">Previous page</button><span>Page {{ page }}</span><button type="button" (click)="load(page + 1)" [disabled]="items().length < 25 || loading() || saving()">Next page</button></div>
+    </section>
+  }
+  @if (editingProfile()) {
+    @if (options(); as config) { <section class="panel"><h2>{{ detail() ? 'Edit application profile' : 'Manual application creation' }}</h2>
+    <p>Manual source and acting staff identity are recorded by the server. Documents and academic review are required just as for online applications.</p>
+    <app-student-profile-form [profile]="profile" [options]="config" [saving]="saving()" [lockEnrollmentRequest]="detail() !== null" [lockEmail]="detail() !== null" [canEditHealth]="(!detail() || pendingProfileHealth()) && can('students.health.write')" submitLabel="Save application for review" (saved)="saveProfile($event)" (dirtyChange)="dirty = $event" />
+    </section> }
+  }
+  @if (detail(); as d) {
+    <section class="panel" [attr.aria-busy]="saving()"><h2>Application {{ d.reference }}</h2>
+    <p><span class="status" [class.pending]="editable(d)">{{ d.status }}</span> · {{ d.source }} · Revision {{ d.version }}</p>
+    @if (saving()) { <p role="status">Saving / loading…</p> }
+    @if (!hasResolvedLrn(d.profile)) {
+      <section class="panel"><h3>Pending LRN · {{ d.profile.lrnStatus }}</h3>
+      <p class="notice" role="status">LRN is unresolved. Document and academic review may continue, but approval is unavailable until staff resolve a valid LRN.</p>
+      <p id="lrn-resolution-warning">Independently verify the applicant's identity and assigned LRN before saving. Resolution is not an automatic student merge or identity check. Conflicts require staff investigation; do not overwrite or merge records based on LRN alone.</p>
+      @if (can('enrollment.write') && editable(d)) {
+        <form #resolutionForm="ngForm" (ngSubmit)="resolveLrn()" (input)="resolutionDirty = true" (change)="resolutionDirty = true">
+        <fieldset [disabled]="saving() || editingProfile()"><legend>Resolve verified LRN</legend>
+        <label>Verified LRN *<input name="resolutionLrn" [(ngModel)]="resolutionLrn" required pattern="[0-9]{12}" inputmode="numeric" aria-describedby="lrn-resolution-warning" /><small>Exactly 12 digits; preserve leading zeroes.</small></label>
+        <label>Identity-verification reason *<textarea name="resolutionReason" [(ngModel)]="resolutionReason" required></textarea></label>
+        <button type="submit" [disabled]="saving() || editingProfile() || resolutionForm.invalid || !resolutionReason.trim()">Resolve LRN</button>
+        </fieldset></form>
+      } @else { <p>Resolution requires enrollment.write permission and an editable application.</p> }
+      </section>
+    }
+    @if (d.enrollmentId) { <p>Official enrollment linked: {{ d.enrollmentId }}</p> }
+    @if (can('enrollment.write') && editable(d)) { <button type="button" (click)="editProfile()" [disabled]="saving() || editingProfile() || !!configurationUnavailable()">Edit / correct application profile</button> }
+    <details open><summary>Profile review</summary><app-application-profile-review [p]="d.profile" /></details>
+    <section class="panel">
+    @if (options(); as config) {
+      <app-application-documents [options]="config" [documents]="d.documents" [busy]="saving()" [canUpload]="can('enrollment.write') && editable(d) && !editingProfile()" [canDownload]="can('enrollment.documents.review')" [canReview]="can('enrollment.documents.review') && editable(d)"
+      (upload)="upload($event)" (download)="download($event)" (review)="reviewDocument($event)" (dirtyChange)="dirty = $event" />
+    } @else { <h3>Documents</h3><p>Document upload configuration unavailable.</p>@for (doc of d.documents; track doc.id) { <p>{{ doc.kind }} — {{ doc.receiptMode }} — {{ doc.status }} — {{ doc.remarks }}</p> } }
+    @if (can('enrollment.documents.review') && d.source === 'Manual' && editable(d)) {
+      <fieldset [disabled]="saving()"><legend>Physical document receipt</legend>
+      <label>Document<select name="physicalKind" [(ngModel)]="physicalKind"><option value="PSA">PSA / Live Birth</option><option value="ReportCard">Previous report card</option><option value="IdPicture">1×1 ID picture</option></select></label>
+      <label>Receipt remarks<textarea name="physicalRemarks" [(ngModel)]="physicalRemarks" (ngModelChange)="changed()"></textarea></label>
+      <button type="button" (click)="physical()" [disabled]="saving() || !physicalRemarks.trim()">Record physical receipt</button>
+      <p>The server records the receiving staff member. Physical receipt does not imply verified or uploaded.</p>
+      </fieldset>
+    }</section>
+    <section class="panel"><h3>Previous academic evidence</h3>
+    <p>{{ d.profile.applicationType === 'Returning' ? 'Returning student — evidence is server-selected finalized school grades only.' : 'External previous-school record — not current-school teacher grades.' }} No automatic promotion or rejection.</p>
+    @if (!grades.length) { <p>No subject-level academic evidence available. Missing evidence is not a passing grade.</p> }
+    <fieldset [disabled]="saving() || !editable(d)"><div class="table-wrap"><table><caption>Subject evidence and reviewer-marked outcomes</caption>
+    <thead><tr><th scope="col">Subject / source</th><th scope="col">Original grade</th><th scope="col">Outcome</th><th scope="col">Subject remarks</th><th scope="col">Action</th></tr></thead><tbody>
+    @for (grade of grades; track $index; let i = $index) { <tr [class.failed]="grade.outcome === 'Failed' || grade.outcome === 'Incomplete' || grade.outcome === 'Unknown'">
+    <td>@if (can('enrollment.previous-grades.write') && d.profile.applicationType !== 'Returning') { <label>Subject {{ i + 1 }}<input [name]="'subject' + i" [(ngModel)]="grade.subject" (ngModelChange)="changed()" /></label> } @else { {{ grade.subject }} }<small>{{ grade.provenance }}</small></td>
+    <td>@if (can('enrollment.previous-grades.write') && d.profile.applicationType !== 'Returning') { <label>Original grade {{ i + 1 }}<input type="number" step="any" [name]="'grade' + i" [(ngModel)]="grade.grade" (ngModelChange)="changed()" /></label> } @else { {{ grade.grade ?? 'Missing / incomplete' }} }</td>
+    <td>@if (can('enrollment.academic.review') || (can('enrollment.previous-grades.write') && d.profile.applicationType !== 'Returning')) { <label>Outcome {{ i + 1 }}<select [name]="'outcome' + i" [(ngModel)]="grade.outcome" (ngModelChange)="changed()"><option value="Unreviewed">Unreviewed</option>@for (outcome of outcomes; track outcome) { <option [value]="outcome">{{ outcome }}</option> }</select></label> } @else { {{ grade.outcome }} }</td>
+    <td>@if (can('enrollment.academic.review') || (can('enrollment.previous-grades.write') && d.profile.applicationType !== 'Returning')) { <label>Remarks {{ i + 1 }}<textarea [name]="'gradeRemarks' + i" [(ngModel)]="grade.remarks" (ngModelChange)="changed()"></textarea></label> } @else { {{ grade.remarks }} }</td>
+    <td>@if (can('enrollment.previous-grades.write') && d.profile.applicationType !== 'Returning') { <button type="button" (click)="removeGrade(i)" [disabled]="saving()">Remove subject {{ i + 1 }}</button> }</td>
+    </tr> }
+    </tbody></table></div>
+    @if (can('enrollment.previous-grades.write') && d.profile.applicationType !== 'Returning') {
+      <button type="button" (click)="addGrade()" [disabled]="saving() || grades.length >= 50">Add external subject</button>
+      <label>Evidence provenance / report-card remarks<textarea name="evidenceRemarks" [(ngModel)]="evidenceRemarks" (ngModelChange)="changed()"></textarea></label>
+      <button type="button" (click)="saveGrades()" [disabled]="saving()">Save external grades</button>
+    }
+    @if (can('enrollment.academic.review')) {
+      <h3>Structured academic decision</h3>
+      <label>Decision<select name="academicDecision" [(ngModel)]="review.decision" (ngModelChange)="changed()">@for (decision of decisions; track decision) { <option [value]="decision" [disabled]="decision === 'EligibleWithConditions' && !can('enrollment.exceptions.approve')">{{ decision }}</option> }</select></label>
+      <label>Student-visible remarks / explicit conditions<textarea name="visibleRemarks" [(ngModel)]="review.studentVisibleRemarks" (ngModelChange)="changed()"></textarea></label>
+      <label>Internal notes (not shown to student)<textarea name="internalRemarks" [(ngModel)]="review.internalRemarks" (ngModelChange)="changed()"></textarea></label>
+      <p>Failed, incomplete, and unknown subjects require remarks. Conditional eligibility requires exception permission. Not Applicable is checked against school entry-grade policy by the server.</p>
+      <button type="button" class="primary" (click)="saveAcademicReview()" [disabled]="saving()">Record academic decision</button>
+    } @else if (d.academicReview; as decision) { <h3>Recorded decision: {{ decision.decision }}</h3><p>Student-visible: {{ decision.studentVisibleRemarks }}</p><p>Internal: {{ decision.internalRemarks }}</p> }
+    </fieldset></section>
+    <section class="panel"><h3>Restricted health details</h3>
+    @if (can('students.health.read')) { <button type="button" (click)="loadHealth()" [disabled]="saving() || dirty">Load restricted health</button> }
+    @if (!can('students.health.read') && !can('students.health.write')) { <p>Separate health permission required. Enrollment approval does not grant health access.</p> }
+    @if (healthLoaded() && !health()) { <p>No health details recorded.</p> }
+    @if (can('students.health.write') && !health()) { <button type="button" (click)="newHealth()" [disabled]="saving() || dirty">Enter optional health details</button> }
+    @if (health(); as h) { <fieldset [disabled]="saving() || !can('students.health.write')"><div class="fields">
+      <label>Blood type<input name="bloodType" [(ngModel)]="h.bloodType" (ngModelChange)="changed()" /><small>Use Unknown when unavailable.</small></label>
+      <label>Height (cm)<input type="number" step="any" min="0.01" name="heightCm" [(ngModel)]="h.heightCm" (ngModelChange)="changed()" /></label>
+      <label>Weight (kg)<input type="number" step="any" min="0.01" name="weightKg" [(ngModel)]="h.weightKg" (ngModelChange)="changed()" /></label>
+      <label>Date of weighing<input type="date" name="weighingDate" [(ngModel)]="h.weighingDate" (ngModelChange)="changed()" /></label></div>
+      <label>Health history<textarea name="healthHistory" [(ngModel)]="h.history" (ngModelChange)="changed()"></textarea></label>
+      @if (can('students.health.write')) { <button type="button" (click)="saveHealth()" [disabled]="saving()">Save restricted health</button> }
+      </fieldset> }
+    </section>
+    <section class="panel"><h3>Placement / final disposition</h3>
+    <p>Server revalidates document evidence, academic decision, concurrency, and active offerings. Approval alone creates the official enrollment.</p>
+    <fieldset [disabled]="saving() || !editable(d)">
+    @if (can('enrollment.confirm')) {
+      <label>Section (matching requested school year and grade)<select name="section" [(ngModel)]="sectionId" (ngModelChange)="selectSection()"><option [ngValue]="0">Select section</option>@for (section of sections(); track section.sectionId) { <option [ngValue]="section.sectionId">{{ section.name }} — {{ section.gradeLevelName }}</option> }</select></label>
+      @if (sectionId && !subjects().length) { <p>No active offered subjects are loaded. Approval is unavailable.</p> }
+      @for (subject of subjects(); track subject.sectionSubjectId) { <label class="check"><input type="checkbox" [checked]="selectedSubjectIds.includes(subject.sectionSubjectId)" (change)="toggleSubject(subject.sectionSubjectId, $any($event.target).checked)" /> {{ subject.subjectCode }} — {{ subject.subjectName }}</label> }
+    }
+    @if (can('enrollment.confirm') || can('enrollment.write')) { <label>Approval / correction / rejection reason<textarea name="dispositionReason" [(ngModel)]="reason" (ngModelChange)="changed()"></textarea></label> }
+    <div class="actions">
+    @if (can('enrollment.confirm')) { <button type="button" class="primary" (click)="approve()" [disabled]="saving() || !hasResolvedLrn(d.profile) || !sectionId || !selectedSubjectIds.length || !reason.trim() || (d.academicReview?.decision === 'EligibleWithConditions' && !can('enrollment.exceptions.approve'))">Approve and officially enroll</button> }
+    @if (can('enrollment.write')) { <button type="button" (click)="changeStatus('NeedsCorrection')" [disabled]="saving() || !reason.trim()">Request correction</button><button type="button" (click)="changeStatus('PendingReview')" [disabled]="saving() || !reason.trim()">Return to pending review</button><button type="button" (click)="changeStatus('Rejected')" [disabled]="saving() || !reason.trim()">Reject application</button> }
+    </div></fieldset></section>
+    <section class="panel"><h3>Application / enrollment history</h3>
+    @for (entry of d.history; track $index) { <article class="panel"><strong>{{ entry.status }}</strong><p>{{ entry.remarks }}</p><small>{{ entry.actor }} · {{ entry.occurredAt }}</small></article> }
+    @if (!d.history.length) { <p>No history entries returned.</p> }
+    </section>
+    </section>
+  }
+</main>

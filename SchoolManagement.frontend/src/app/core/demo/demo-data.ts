@@ -341,7 +341,7 @@ export class DemoData {
     .flatMap((enrollment) =>
       enrollment.subjects.map((subject, index) => {
         const student = this.students.find((row) => row.studentId === enrollment.studentId)!;
-        const state = ['Draft', 'Submitted', 'UnderReview', 'Approved', 'Finalized'][
+        const state = enrollment.studentId === 1 && index === 2 ? 'Finalized' : ['Draft', 'Submitted', 'UnderReview', 'Approved', 'Finalized'][
           (enrollment.enrollmentId + index - 1) % 5
         ];
         return {

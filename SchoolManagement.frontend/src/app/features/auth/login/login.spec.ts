@@ -61,6 +61,7 @@ describe('Login', () => {
       username: 'jdoe',
       roles: ['Registrar'],
     });
+    httpMock.expectOne(`${environment.apiBaseUrl}/auth/permissions`).flush(['reports.read']);
 
     expect(navigateSpy).toHaveBeenCalledWith('/dashboard');
   });
